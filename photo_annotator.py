@@ -1,9 +1,12 @@
 import os
+import json
 import sys
 import tkinter as tk
 import subprocess
 from tkinter import filedialog, simpledialog, messagebox, Button
 import time
+CONFIG_FILE = "photo_annotator_config.json"
+
 
 def install_dependencies():
     libraries = ["Pillow", "pandas"]
@@ -153,7 +156,16 @@ def select_starting_image(image_dir):
 
     return os.path.basename(starting_image)
 
+def save_window_position(window):
+    position = f"+{window.winfo_x()}+{window.winfo_y()}"
+    with open(CONFIG_FILE, "w") as file:
+        json.dump({"position": position}, file)
 
+def load_window_position(window):
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as file:
+            config = json.load(file)
+            window.geometry(config["position"])    
 
 def show_image_and_get_input(image_path, default_location="", default_comment="", default_photographer="", default_address=""):
     if not tkinter_running:
@@ -173,6 +185,7 @@ def show_image_and_get_input(image_path, default_location="", default_comment=""
         nonlocal photo
         label.config(image=None)
         photo = None
+        save_window_position(tk_window)  # Save the window position
         tk_window.destroy()
     
     def delete_and_continue():
@@ -207,6 +220,9 @@ def show_image_and_get_input(image_path, default_location="", default_comment=""
     tk_window.title(os.path.basename(image_path))
     tk_window.protocol("WM_DELETE_WINDOW", on_quit)  # Set the same quit protocol for the Toplevel window
 
+    screen_width = tk_window.winfo_screenwidth()
+    screen_height = tk_window.winfo_screenheight()
+
     # Disable window resizing
     tk_window.resizable(False, False)
 
@@ -216,24 +232,24 @@ def show_image_and_get_input(image_path, default_location="", default_comment=""
     if image.height > image.width:
         image = image.rotate(90, expand=True)
 
-    image = image.resize((800, image.height * 800 // image.width), Image.LANCZOS)
+    image = image.resize((round(screen_width/2), image.height * round(screen_width/2) // image.width), Image.LANCZOS)
 
     photo = ImageTk.PhotoImage(image)
 
     # Set the window size and position
-    window_width = round(image.width )
+    window_width = round(image.width)
     window_height = round(image.height+100)
-    screen_width = tk_window.winfo_screenwidth()
-    screen_height = tk_window.winfo_screenheight()
-    x_coordinate = int((screen_width / 2) - (window_width / 2))
-    y_coordinate = int((screen_height / 2) - (window_height / 2))
-    tk_window.geometry(f"{window_width}x{window_height}+{x_coordinate}+{y_coordinate}")
 
+    # Load the saved window position if it exists, otherwise set the initial position
+    if not os.path.exists(CONFIG_FILE):
+        x_coordinate = int((screen_width / 2) - (window_width / 2))
+        y_coordinate = int((screen_height / 2) - (window_height / 2))
+        tk_window.geometry(f"{window_width}x{window_height}+{x_coordinate}+{y_coordinate}")
+    else:
+        load_window_position(tk_window)
 
     label = tk.Label(tk_window, image=photo)
     label.pack()
-
-
 
     # Keep a reference to the photo object to prevent garbage collection
     # label.image = photo
@@ -343,7 +359,7 @@ def main():
     print("                 ████████████████                 ")
 
     print('\n')
-    print("PHOTO ANNOTATOR V.0.5")
+    print("PHOTO ANNOTATOR V.0.6")
     print("Implemented by Kelvin Filyk")
     print("Municon West Coast")
     print('\n')
@@ -419,7 +435,7 @@ def main():
                     if default_address.strip() == "":
                         default_address = address
 
-                output_name = address+"_"+str(image_index)+".jpg"
+                output_name = address.strip()+"_"+str(image_index)+".jpg"
                 output_name = output_name.replace(" ", "_")
                 output_path = os.path.join(prints_dir, output_name)
                 
